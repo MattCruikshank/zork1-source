@@ -1,43 +1,48 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 
-# Install unzip
-RUN apt-get update && apt-get install -y unzip wget frotz git
+# Install build dependencies and clean up in same layer
+RUN apt-get update && \
+    apt-get install -y unzip wget git && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Download and build ZILF
+RUN wget https://foss.heptapod.net/zilf/zilf/-/archive/branch/default/zilf-branch-default.zip?ref_type=heads -O zilf.zip && \
+    unzip zilf.zip && \
+    rm zilf.zip && \
+    cd zilf-branch-default && \
+    dotnet build Zilf.sln
+
+# Clone and build Zork1
+RUN git clone https://github.com/historicalsource/zork1.git && \
+    cd zork1 && \
+    /build/zilf-branch-default/bin/Debug/net10.0/zilf zork1.zil && \
+    /build/zilf-branch-default/bin/Debug/net10.0/zapf zork1.zap zork1-ignite.z3
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# Install only runtime dependency
+RUN apt-get update && \
+    apt-get install -y frotz && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN useradd -m builder
-USER builder
-WORKDIR /home/builder
+RUN useradd -m zork
+USER zork
+WORKDIR /home/zork
 
-# Clone ZILF repository and build
-RUN mkdir /home/builder/zilf
-WORKDIR /home/builder/zilf
-RUN wget https://foss.heptapod.net/zilf/zilf/-/archive/branch/default/zilf-branch-default.zip?ref_type=heads -O zilf-branch-default.zip
-RUN unzip zilf-branch-default.zip
-WORKDIR /home/builder/zilf/zilf-branch-default
-# RUN echo "unzip $(date)"
-# RUN find "$(pwd)" -name "*.sln"
+# Copy only the compiled game file
+COPY --from=builder /build/zork1/zork1-ignite.z3 .
 
-RUN dotnet build Zilf.sln
-# RUN echo "dotnet build $(date)"
-# RUN find "$(pwd)" -name "zilf*"
-
-# git clone https://github.com/historicalsource/zork1.git
-WORKDIR /home/builder
-RUN mkdir zork1
-RUN git clone https://github.com/historicalsource/zork1.git
-
-WORKDIR /home/builder/zork1
-
-# Build zork1-ignite.z3
-RUN /home/builder/zilf/zilf-branch-default/bin/Debug/net10.0/zilf zork1.zil
-RUN /home/builder/zilf/zilf-branch-default/bin/Debug/net10.0/zapf zork1.zap zork1-ignite.z3
-
+# Create save directory
 RUN mkdir save
 
-WORKDIR /home/builder/zork1/save
+VOLUME [ "/home/zork/save" ]
 
-VOLUME [ "/home/builder/zork1/save" ]
+# Set working directory to save folder so Frotz saves there
+WORKDIR /home/zork/save
 
-# RUN find "/" -name "frotz"
-
-CMD [ "/usr/games/frotz", "/home/builder/zork1/zork1-ignite.z3" ]
+CMD [ "/usr/games/frotz", "/home/zork/zork1-ignite.z3" ]
