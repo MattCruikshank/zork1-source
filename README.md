@@ -1,14 +1,12 @@
-> sudo docker build --progress=plain -t zork1-source .
->
-> sudo docker run -it -v $(pwd)/saves:/home/builder/zork1/save zork1-source
+To try it:
 
-> sudo docker run -it -v $(pwd)/saves:/home/builder/zork1/save mattcruikshank/zork1-source 
+> docker run -it --rm -v $(pwd)/saves:/home/zork/save mattcruikshank/zork1-source:latest
 
-//////////////////////
+https://hub.docker.com/repository/docker/mattcruikshank/zork1-source/
+
+Notes for how I build, push, and run it:
 
 > docker build -t mattcruikshank/zork1-source:latest .
-
-> docker login
 
 > docker push mattcruikshank/zork1-source:latest
 
